@@ -1,0 +1,13 @@
+# Citlivé údaje
+config.py
+
+# Python cache
+__pycache__/
+*.pyc
+*.pyo
+
+# Claude nastavenia
+.claude/
+
+# MicroPico
+.micropico
