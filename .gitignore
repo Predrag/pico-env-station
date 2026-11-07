@@ -11,3 +11,9 @@ __pycache__/
 
 # MicroPico
 .micropico
+
+# Virtuálne prostredie
+.venv/
+
+# pytest cache
+.pytest_cache/
