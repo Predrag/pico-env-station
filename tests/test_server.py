@@ -1,5 +1,6 @@
 import pytest
 import json
+from unittest.mock import patch
 import server
 
 
@@ -83,6 +84,56 @@ async def test_root_zobrazuje_placeholder_bez_dat():
     writer = FakeWriter()
     await server._handle(FakeReader("/"), writer)
     assert b"--" in writer.data
+
+
+@pytest.mark.asyncio
+async def test_api_memory_vrati_json_s_ram():
+    with patch('gc.mem_free', return_value=100000), \
+         patch('gc.mem_alloc', return_value=50000):
+        writer = FakeWriter()
+        await server._handle(FakeReader("/api/memory"), writer)
+        body = writer.data.split(b"\r\n\r\n", 1)[1]
+        data = json.loads(body)
+        assert data["free_b"] == 100000
+        assert data["used_b"] == 50000
+        assert data["total_b"] == 150000
+        assert data["used_pct"] == 33.3
+
+
+@pytest.mark.asyncio
+async def test_api_memory_content_type_je_json():
+    with patch('gc.mem_free', return_value=80000), \
+         patch('gc.mem_alloc', return_value=20000):
+        writer = FakeWriter()
+        await server._handle(FakeReader("/api/memory"), writer)
+        assert b"application/json" in writer.data
+
+
+@pytest.mark.asyncio
+async def test_memory_stranka_obsahuje_kb_hodnoty():
+    with patch('gc.mem_free', return_value=200*1024), \
+         patch('gc.mem_alloc', return_value=50*1024):
+        writer = FakeWriter()
+        await server._handle(FakeReader("/memory"), writer)
+        assert b"text/html" in writer.data
+        assert b"200.0" in writer.data  # free_kb
+        assert b"50.0" in writer.data   # used_kb
+
+
+@pytest.mark.asyncio
+async def test_memory_stranka_obsahuje_odkaz_na_hlavnu():
+    with patch('gc.mem_free', return_value=100*1024), \
+         patch('gc.mem_alloc', return_value=50*1024):
+        writer = FakeWriter()
+        await server._handle(FakeReader("/memory"), writer)
+        assert b'href="/"' in writer.data
+
+
+@pytest.mark.asyncio
+async def test_root_obsahuje_odkaz_na_memory():
+    writer = FakeWriter()
+    await server._handle(FakeReader("/"), writer)
+    assert b'href="/memory"' in writer.data
 
 
 @pytest.mark.asyncio

@@ -1,3 +1,4 @@
+import config
 import network
 import time
 
@@ -22,3 +23,18 @@ class WifiManager:
 
     def ip(self):
         return self.wlan.ifconfig()[0]
+
+    def start_ap(self, ssid=config.AP_SSID, password=config.AP_PASSWORD):
+        ap = network.WLAN(network.AP_IF)
+        ap.active(False)
+        network.hostname(self.hostname)
+        ap.config(ssid=ssid, password=password)
+        ap.active(True)
+        return ap.ifconfig()[0]
+
+    def stop_ap(self):
+        ap = network.WLAN(network.AP_IF)
+        ap.active(False)
+
+    def stop_sta(self):
+        self.wlan.active(False)

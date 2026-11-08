@@ -36,3 +36,59 @@ def test_hostname_sa_da_nastavit():
     sys.modules["network"].WLAN.return_value = MagicMock()
     manager = WifiManager(ssid="net", password="pass", hostname="moj-pico")
     assert manager.hostname == "moj-pico"
+
+
+def _make_manager_with_ap(ap_ip="192.168.4.1"):
+    sta_mock = MagicMock()
+    sta_mock.isconnected.return_value = True
+    ap_mock = MagicMock()
+    ap_mock.ifconfig.return_value = (ap_ip, "255.255.255.0", ap_ip, "0.0.0.0")
+    sys.modules["network"].AP_IF = 1
+    sys.modules["network"].STA_IF = 0
+    sys.modules["network"].WLAN.side_effect = [sta_mock, ap_mock]
+    return WifiManager(ssid="test", password="pass"), ap_mock
+
+
+def test_start_ap_vrati_ip_adresu():
+    manager, _ = _make_manager_with_ap(ap_ip="192.168.4.1")
+    ip = manager.start_ap()
+    assert ip == "192.168.4.1"
+
+
+def test_start_ap_aktivuje_ap_interface():
+    manager, ap_mock = _make_manager_with_ap()
+    manager.start_ap()
+    ap_mock.active.assert_called_with(True)
+
+
+def test_start_ap_pouzije_zadany_ssid():
+    manager, ap_mock = _make_manager_with_ap()
+    manager.start_ap(ssid="MojPico", password="tajneheslo")
+    ap_mock.config.assert_called_with(ssid="MojPico", password="tajneheslo")
+
+
+def test_start_ap_ma_vychodzi_ssid():
+    manager, ap_mock = _make_manager_with_ap()
+    manager.start_ap()
+    ap_mock.config.assert_called_with(ssid="PicoEnvStation", password="pico1234")
+
+
+def test_stop_ap_deaktivuje_ap_interface():
+    sta_mock = MagicMock()
+    ap_mock = MagicMock()
+    sys.modules["network"].AP_IF = 1
+    sys.modules["network"].STA_IF = 0
+    sys.modules["network"].WLAN.side_effect = [sta_mock, ap_mock]
+    manager = WifiManager(ssid="test", password="pass")
+    manager.stop_ap()
+    ap_mock.active.assert_called_with(False)
+
+
+def test_stop_sta_deaktivuje_sta_interface():
+    sta_mock = MagicMock()
+    sys.modules["network"].WLAN.side_effect = None  # reset po predchádzajúcom teste
+    sys.modules["network"].WLAN.return_value = sta_mock
+    sys.modules["network"].STA_IF = 0
+    manager = WifiManager(ssid="test", password="pass")
+    manager.stop_sta()
+    sta_mock.active.assert_called_with(False)
