@@ -2,7 +2,7 @@
 
 ## Čo je tento projekt
 
-Environmentálna monitorovacia stanica na **Raspberry Pi Pico W** s DHT11 senzorom, Wi-Fi pripojením, vstavaným webovým serverom a integráciou s **Google Home** cez Home Assistant. Napísaná v **MicroPython**.
+Environmentálna monitorovacia stanica na **Raspberry Pi Pico W** s DHT11 senzorom, Wi-Fi pripojením, vstavaným webovým serverom a integráciou s **Home Assistant**. Napísaná v **MicroPython**.
 
 ## Stav projektu
 
@@ -80,32 +80,34 @@ Súbory ignorované pri uploade (`micropico.pyIgnore`):
 - `config.py` obsahuje reálne Wi-Fi heslo — **nikdy ho nekomitnúť**. Je v `.gitignore`.
 - Na Pico ide: `main.py`, `config.py`, `server.py`, `wifi_manager.py`, `dns_server.py`, `sensors/`, `libs/`
 - LCD knižnica (`DIYables_MicroPython_LCD_I2C`) je v projekte, ale ešte nie je integrovaná do `main.py`
+- `pico.local` mDNS nefunguje v Docker kontajneri — v HA konfigurácii používaj IP adresu Pica (`192.168.0.235`)
 
-## Google Home integrácia
+## Home Assistant integrácia
 
-### Infraštruktúra (beží na Fedora PC)
+### Infraštruktúra (beží na Raspberry Pi 4B — autonómne, nezávislé od Fedory)
 
 | Komponent | Umiestnenie | Popis |
 |-----------|-------------|-------|
-| Home Assistant | Podman kontajner | čita `/api/temperature` z Pica |
-| DuckDNS | `predrag-ha.duckdns.org` | bezplatná dynamická DNS |
-| Caddy | systemd služba | reverse proxy s HTTPS (Let's Encrypt) |
-| Google Actions | projekt `testssss-05c37` | prepojenie s Google Home |
+| Home Assistant | Docker kontajner na Pi 4B | čita `/api/temperature` z Pica |
+| DuckDNS | statický DNS záznam (bez timera) | `predrag-ha.duckdns.org` → `88.212.33.47` (statická IP, nepotrebuje aktualizácie) |
+| Caddy | systemd služba na Pi 4B | reverse proxy s HTTPS (Let's Encrypt) |
 
-### Spustenie Home Assistant
+SSH prístup na Pi: `ssh -i ~/.ssh/githubSsh rpi4@rpi4.local`
+Pi IP adresa: `192.168.0.89`
+
+### Správa Home Assistant (cez SSH na Pi)
 
 ```bash
-podman start homeassistant   # spustiť
-podman stop homeassistant    # zastaviť
-podman restart homeassistant # reštartovať
-podman logs homeassistant    # logy
+ssh -i ~/.ssh/githubSsh rpi4@rpi4.local
+
+docker start homeassistant    # spustiť
+docker stop homeassistant     # zastaviť
+docker restart homeassistant  # reštartovať
+docker logs homeassistant     # logy
 ```
 
-> **Stav:** Home Assistant je momentálne **zastavený** (šetrenie RAM/CPU).
-> Spusti `podman start homeassistant` keď ho potrebuješ.
-
-Konfigurácia: `~/homeassistant/configuration.yaml`
-Service account: `~/homeassistant/SERVICE_ACCOUNT.json`
+Konfigurácia: `~/homeassistant/configuration.yaml` (na Pi)
+Dashboard: `~/homeassistant/ui-lovelace.yaml` a `~/homeassistant/pico-dashboard.yaml`
 
 ### Kritická poznámka — trusted_proxies
 
@@ -113,29 +115,26 @@ V HA 2024+ je HTTP konfigurácia migrovaná do `.storage/http` a YAML sa ignoruj
 Ak HA hlási `"not set-up for reverse proxies"` napriek správnemu YAML:
 
 ```bash
-podman stop homeassistant
-rm ~/homeassistant/.storage/http
-podman start homeassistant
+ssh -i ~/.ssh/githubSsh rpi4@rpi4.local
+docker exec homeassistant rm -f /config/.storage/http
+docker restart homeassistant
 ```
 
-Toto núti HA znovu načítať `trusted_proxies` z `configuration.yaml`.
+### DuckDNS
 
-### DuckDNS auto-aktualizácia
+Statický záznam — `predrag-ha.duckdns.org` trvalo smeruje na `88.212.33.47`.
+DuckDNS timer bol odstránený (statická IP sa nemení, aktualizácie nie sú potrebné).
 
-Beží ako systemd user timer (`~/.config/systemd/user/duckdns.timer`) — aktualizuje IP každých 5 minút.
-
-```bash
-systemctl --user status duckdns.timer
-```
-
-### Caddy
+### Caddy (na Pi)
 
 ```bash
+ssh -i ~/.ssh/githubSsh rpi4@rpi4.local
 sudo systemctl status caddy
 sudo systemctl reload caddy
 ```
 
 Caddyfile: `/etc/caddy/Caddyfile` — proxy na `127.0.0.1:8123`
+Externá URL: `https://predrag-ha.duckdns.org`
 
 ## Plánované rozšírenia
 

@@ -1,6 +1,6 @@
 # pico-env-station
 
-Environmental monitoring station built on **Raspberry Pi Pico W** with a DHT11 sensor, Wi-Fi connectivity, and a built-in web server. Sensor data is accessible via a browser dashboard, a REST API, and **Google Home / Google Assistant**.
+Environmental monitoring station built on **Raspberry Pi Pico W** with a DHT11 sensor, Wi-Fi connectivity, and a built-in web server. Sensor data is accessible via a browser dashboard, a REST API, and **Home Assistant**.
 
 ## Features
 
@@ -12,7 +12,7 @@ Environmental monitoring station built on **Raspberry Pi Pico W** with a DHT11 s
 - Hardware button (GP15) to manually switch between STA and AP mode
 - mDNS hostname (`pico.local`) in both STA and AP mode
 - Built-in DNS server for AP mode (resolves all hostnames to Pico IP)
-- Google Home / Google Assistant integration via Home Assistant
+- Home Assistant integration (temperature & humidity visible in HA dashboard and mobile app)
 
 ## Hardware
 
@@ -104,38 +104,39 @@ pip install pytest pytest-asyncio
 pytest tests/ -v
 ```
 
-## Google Home Integration
+## Home Assistant Integration
 
-Pico sensor data is exposed to Google Home via **Home Assistant**.
+Pico sensor data is exposed to Home Assistant running on a **Raspberry Pi 4B**.
 
-### Infrastructure required
+### Infrastructure
 
-| Component | Purpose |
-|-----------|---------|
-| Home Assistant (Podman) | Reads Pico API, exposes to Google |
-| DuckDNS | Free dynamic DNS (`predrag-ha.duckdns.org`) |
-| Caddy | Reverse proxy with automatic HTTPS (Let's Encrypt) |
-| Google Actions project | Links Google Home to Home Assistant |
+| Component | Runs on | Purpose |
+|-----------|---------|---------|
+| Home Assistant | Raspberry Pi 4B (Docker) | Reads Pico API, dashboards, automations |
+| DuckDNS | Static record only (no updater) | Free DNS — static public IP, no auto-update needed |
+| Caddy | Raspberry Pi 4B (systemd) | Reverse proxy with automatic HTTPS |
 
-### Home Assistant setup (Podman)
+### Home Assistant setup (Docker on Raspberry Pi 4B)
 
 ```bash
 mkdir -p ~/homeassistant
-podman run -d \
+docker run -d \
   --name homeassistant \
   --privileged \
   --restart=unless-stopped \
-  -v ~/homeassistant:/config:Z \
+  -v ~/homeassistant:/config \
   -e TZ=Europe/Bratislava \
   --network=host \
   ghcr.io/home-assistant/home-assistant:stable
 ```
 
-Access at `http://localhost:8123`.
+Access at `http://localhost:8123` or `https://predrag-ha.duckdns.org`.
 
-### configuration.yaml (~/homeassistant/configuration.yaml)
+### configuration.yaml
 
 ```yaml
+default_config:
+
 homeassistant:
   external_url: "https://your-domain.duckdns.org"
   internal_url: "http://localhost:8123"
@@ -144,7 +145,7 @@ sensor:
   - platform: rest
     name: "Pico Teplota"
     unique_id: pico_temperature
-    resource: http://pico.local/api/temperature
+    resource: http://<PICO_IP>/api/temperature
     value_template: "{{ value_json.temperature }}"
     unit_of_measurement: "°C"
     device_class: temperature
@@ -153,7 +154,7 @@ sensor:
   - platform: rest
     name: "Pico Vlhkosť"
     unique_id: pico_humidity
-    resource: http://pico.local/api/temperature
+    resource: http://<PICO_IP>/api/temperature
     value_template: "{{ value_json.humidity }}"
     unit_of_measurement: "%"
     device_class: humidity
@@ -165,16 +166,11 @@ http:
     - 127.0.0.1
     - "::1"
     - "::ffff:127.0.0.1"
-
-google_assistant:
-  project_id: YOUR_GOOGLE_ACTIONS_PROJECT_ID
-  service_account: !include SERVICE_ACCOUNT.json
-  report_state: true
-  exposed_domains:
-    - sensor
 ```
 
-> **Important:** If Home Assistant ignores `trusted_proxies` (error in logs: "not set-up for reverse proxies"), delete `~/.homeassistant/.storage/http` and restart. This forces HA to reload the HTTP config from YAML.
+> **Note:** Use Pico's IP address instead of `pico.local` — mDNS does not work inside Docker containers.
+
+> **Important:** If HA ignores `trusted_proxies` (logs: "not set-up for reverse proxies"), delete `~/homeassistant/.storage/http` and restart Docker container.
 
 ### Caddy (/etc/caddy/Caddyfile)
 
@@ -187,24 +183,6 @@ your-domain.duckdns.org {
     }
 }
 ```
-
-### Google Actions setup
-
-1. Create project at [console.home.google.com](https://console.home.google.com)
-2. Cloud-to-cloud → Develop → Add integration
-3. Fill in OAuth fields:
-   - **OAuth Client ID:** `https://oauth-redirect.googleusercontent.com/r/YOUR_PROJECT_ID`
-   - **Client secret:** `homeassistant`
-   - **Authorization URL:** `https://your-domain.duckdns.org/auth/authorize`
-   - **Token URL:** `https://your-domain.duckdns.org/auth/token`
-4. Enable **HomeGraph API** in Google Cloud Console
-5. Create a **Service Account** (role: Service Account Token Creator), download JSON key → save as `~/homeassistant/SERVICE_ACCOUNT.json`
-6. In Google Home app: **+ → Set up device → Works with Google** → find your integration → log in
-
-### Voice commands
-
-- *"Hey Google, what is the temperature?"*
-- *"Hey Google, what is the humidity?"*
 
 ## Planned Features
 
