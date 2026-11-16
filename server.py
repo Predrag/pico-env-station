@@ -4,11 +4,29 @@ import gc
 
 _temperature = None
 _humidity = None
+_sensor = None
+_on_demand = False
+
+def set_sensor(sensor, on_demand=False):
+    global _sensor, _on_demand
+    _sensor = sensor
+    _on_demand = on_demand
 
 def update_sensor_data(temp, hum):
     global _temperature, _humidity
     _temperature = temp
     _humidity = hum
+
+def _read_sensor():
+    global _temperature, _humidity
+    if _on_demand and _sensor is not None:
+        try:
+            _sensor.measure()
+            _temperature = _sensor.temperature
+            _humidity = _sensor.humidity
+        except OSError:
+            pass
+    return _temperature, _humidity
 
 _STYLE = """
     * {{ box-sizing: border-box; margin: 0; padding: 0; }}
@@ -95,9 +113,10 @@ async def _handle(reader, writer):
 
 
         if path == '/api/temperature':
+            temp, hum = _read_sensor()
             body = json.dumps({
-                "temperature": _temperature,
-                "humidity": _humidity,
+                "temperature": temp,
+                "humidity": hum,
                 "unit": "celsius"
             })
             header = "HTTP/1.1 200 OK\r\nContent-Type: application/json\r\n\r\n"
@@ -135,8 +154,9 @@ async def _handle(reader, writer):
             writer.write((header + body).encode())
 
         elif path == '/':
-            temp = _temperature if _temperature is not None else "--"
-            hum = _humidity if _humidity is not None else "--"
+            t, h = _read_sensor()
+            temp = t if t is not None else "--"
+            hum = h if h is not None else "--"
             style = _STYLE.format(used_pct=0)
             body = _HTML.format(style=style, temp=temp, hum=hum)
             header = "HTTP/1.1 200 OK\r\nContent-Type: text/html; charset=utf-8\r\n\r\n"

@@ -29,10 +29,29 @@ class FakeWriter:
         pass
 
 
+class FakeSensor:
+    def __init__(self, temp, hum):
+        self.temperature = temp
+        self.humidity = hum
+
+    def measure(self):
+        pass
+
+
+class FailingSensor:
+    temperature = None
+    humidity = None
+
+    def measure(self):
+        raise OSError("sensor error")
+
+
 @pytest.fixture(autouse=True)
 def reset_server_state():
     server._temperature = None
     server._humidity = None
+    server._sensor = None
+    server._on_demand = False
     yield
 
 
@@ -141,3 +160,47 @@ async def test_neznama_cesta_vrati_404():
     writer = FakeWriter()
     await server._handle(FakeReader("/neexistuje"), writer)
     assert b"404" in writer.data
+
+
+def test_set_sensor_nastavi_sensor_a_on_demand():
+    sensor = FakeSensor(25, 60)
+    server.set_sensor(sensor, on_demand=True)
+    assert server._sensor is sensor
+    assert server._on_demand is True
+
+
+def test_set_sensor_default_je_interval():
+    sensor = FakeSensor(25, 60)
+    server.set_sensor(sensor)
+    assert server._on_demand is False
+
+
+@pytest.mark.asyncio
+async def test_api_temperature_on_demand_meria_pri_volani():
+    server.set_sensor(FakeSensor(28, 65), on_demand=True)
+    writer = FakeWriter()
+    await server._handle(FakeReader("/api/temperature"), writer)
+    body = writer.data.split(b"\r\n\r\n", 1)[1]
+    data = json.loads(body)
+    assert data["temperature"] == 28
+    assert data["humidity"] == 65
+
+
+@pytest.mark.asyncio
+async def test_root_on_demand_meria_pri_volani():
+    server.set_sensor(FakeSensor(21, 55), on_demand=True)
+    writer = FakeWriter()
+    await server._handle(FakeReader("/"), writer)
+    assert b"21" in writer.data
+    assert b"55" in writer.data
+
+
+@pytest.mark.asyncio
+async def test_api_temperature_on_demand_chyba_senzora_vrati_none():
+    server.set_sensor(FailingSensor(), on_demand=True)
+    writer = FakeWriter()
+    await server._handle(FakeReader("/api/temperature"), writer)
+    body = writer.data.split(b"\r\n\r\n", 1)[1]
+    data = json.loads(body)
+    assert data["temperature"] is None
+    assert data["humidity"] is None

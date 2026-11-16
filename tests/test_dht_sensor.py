@@ -52,3 +52,17 @@ def test_pouzije_dht11_pre_neznamy_model():
     sys.modules["dht"].DHT11.reset_mock()
     DHTSensor(pin=16, model=99)
     sys.modules["dht"].DHT11.assert_called_once()
+
+
+def test_measure_hodi_oserror():
+    hw = MagicMock()
+    hw.measure.side_effect = OSError("sensor failure")
+    sys.modules["dht"].DHT11.return_value = hw
+    sensor = DHTSensor(pin=16, model=11)
+    try:
+        sensor.measure()
+        assert False, "Očakávaná OSError nebola vyhodená"
+    except OSError:
+        pass
+    assert sensor.temperature is None
+    assert sensor.humidity is None

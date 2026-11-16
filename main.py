@@ -23,6 +23,7 @@ def blink(count=1, on_s=0.2, off_s=0.2):
 
 async def meranie():
     time.sleep(2)  # DHT11 potrebuje čas po zapnutí
+    interval = getattr(config, 'SENSOR_INTERVAL', 2)
     while True:
         try:
             sensor.measure()
@@ -30,7 +31,23 @@ async def meranie():
             print(f"Teplota: {sensor.temperature} °C  Vlhkosť: {sensor.humidity} %")
         except OSError as e:
             print(f"Chyba čítania senzora: {e}")
-        await asyncio.sleep(2)
+        await asyncio.sleep(interval)
+
+async def wifi_watchdog(wifi):
+    interval = getattr(config, 'WIFI_RECONNECT_INTERVAL', 30)
+    while True:
+        await asyncio.sleep(interval)
+        if _current_mode != 'sta':
+            continue
+        if not wifi.wlan.isconnected():
+            print("[watchdog] Wi-Fi spojenie stratené, pokúšam sa znovu pripojiť...")
+            blink(1)
+            if wifi.connect():
+                blink(2)
+                print(f"[watchdog] Znovu pripojené! IP: {wifi.ip()}")
+            else:
+                print(f"[watchdog] Reconnect zlyhal, skúsim znova za {interval}s")
+                blink(4)
 
 async def button_handler(wifi):
     global _current_mode
@@ -72,11 +89,26 @@ async def main():
         blink(3)  # AP režim aktívny
         print(f"AP aktívny — pripoj sa na '{config.AP_SSID}', otvor http://{ip}")
 
-    await asyncio.gather(
-        meranie(),
-        server.run(config.SERVER_PORT),
-        dns_server.run(config.AP_IP),
-        button_handler(wifi)
-    )
+    on_demand = getattr(config, 'SENSOR_ON_DEMAND', False)
+    server.set_sensor(sensor, on_demand)
+
+    if on_demand:
+        time.sleep(2)  # DHT11 warmup pred prvým meraním
+        print("Meranie: len na požiadanie (on-demand)")
+        await asyncio.gather(
+            server.run(config.SERVER_PORT),
+            dns_server.run(config.AP_IP),
+            button_handler(wifi),
+            wifi_watchdog(wifi)
+        )
+    else:
+        print(f"Meranie: intervalové každých {getattr(config, 'SENSOR_INTERVAL', 2)}s")
+        await asyncio.gather(
+            meranie(),
+            server.run(config.SERVER_PORT),
+            dns_server.run(config.AP_IP),
+            button_handler(wifi),
+            wifi_watchdog(wifi)
+        )
 
 asyncio.run(main())

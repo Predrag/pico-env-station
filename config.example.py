@@ -13,3 +13,10 @@ BUTTON_PIN = 15
 
 # Sieť
 SERVER_PORT = 80
+WIFI_RECONNECT_INTERVAL = 30  # sekundy medzi pokusmi o znovupripojenie po výpadku Wi-Fi
+
+# Meranie senzora
+# True  = meranie len na požiadanie (pri každom API volaní)
+# False = intervalové meranie na pozadí
+SENSOR_ON_DEMAND = True
+SENSOR_INTERVAL = 2  # sekundy medzi meraniami (len ak SENSOR_ON_DEMAND = False)
