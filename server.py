@@ -119,7 +119,7 @@ async def _handle(reader, writer):
                 "humidity": hum,
                 "unit": "celsius"
             })
-            header = "HTTP/1.1 200 OK\r\nContent-Type: application/json\r\n\r\n"
+            header = "HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nCache-Control: no-store\r\n\r\n"
             writer.write((header + body).encode())
 
         elif path == '/api/memory':
@@ -159,7 +159,7 @@ async def _handle(reader, writer):
             hum = h if h is not None else "--"
             style = _STYLE.format(used_pct=0)
             body = _HTML.format(style=style, temp=temp, hum=hum)
-            header = "HTTP/1.1 200 OK\r\nContent-Type: text/html; charset=utf-8\r\n\r\n"
+            header = "HTTP/1.1 200 OK\r\nContent-Type: text/html; charset=utf-8\r\nCache-Control: no-store\r\n\r\n"
             writer.write((header + body).encode())
 
         else:
