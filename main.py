@@ -99,14 +99,14 @@ async def main():
         blink(3)  # AP režim aktívny
         print(f"AP aktívny — pripoj sa na '{config.AP_SSID}', otvor http://{ip}")
 
+    tasks = [server.run(config.SERVER_PORT), wifi_watchdog(wifi)]
+    if _current_mode == 'ap':
+        tasks.append(dns_server.run(config.AP_IP))
+
     if _debug:
         print("[debug] DEBUG režim — senzor a tlačidlo sú vypnuté")
-        await asyncio.gather(
-            server.run(config.SERVER_PORT),
-            dns_server.run(config.AP_IP),
-            wifi_watchdog(wifi),
-            debug_meranie()
-        )
+        tasks.append(debug_meranie())
+        await asyncio.gather(*tasks)
         return
 
     on_demand = getattr(config, 'SENSOR_ON_DEMAND', False)
@@ -115,20 +115,11 @@ async def main():
     if on_demand:
         time.sleep(2)  # DHT11 warmup pred prvým meraním
         print("Meranie: len na požiadanie (on-demand)")
-        await asyncio.gather(
-            server.run(config.SERVER_PORT),
-            dns_server.run(config.AP_IP),
-            button_handler(wifi),
-            wifi_watchdog(wifi)
-        )
+        tasks.append(button_handler(wifi))
+        await asyncio.gather(*tasks)
     else:
         print(f"Meranie: intervalové každých {getattr(config, 'SENSOR_INTERVAL', 2)}s")
-        await asyncio.gather(
-            meranie(),
-            server.run(config.SERVER_PORT),
-            dns_server.run(config.AP_IP),
-            button_handler(wifi),
-            wifi_watchdog(wifi)
-        )
+        tasks += [meranie(), button_handler(wifi)]
+        await asyncio.gather(*tasks)
 
 asyncio.run(main())
