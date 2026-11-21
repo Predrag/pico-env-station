@@ -8,9 +8,11 @@ import server
 import dns_server
 import network
 
+_debug = getattr(config, 'DEBUG', False)
+
 led = Pin("LED", Pin.OUT)
-button = Pin(config.BUTTON_PIN, Pin.IN, Pin.PULL_UP)
-sensor = DHTSensor(pin=config.DHT_PIN, model=config.DHT_MODEL)
+button = Pin(config.BUTTON_PIN, Pin.IN, Pin.PULL_UP) if not _debug else None
+sensor = DHTSensor(pin=config.DHT_PIN, model=config.DHT_MODEL) if not _debug else None
 
 _current_mode = 'sta'  # 'sta' alebo 'ap'
 
@@ -32,6 +34,14 @@ async def meranie():
         except OSError as e:
             print(f"Chyba čítania senzora: {e}")
         await asyncio.sleep(interval)
+
+async def debug_meranie():
+    temp = getattr(config, 'DEBUG_TEMPERATURE', 25)
+    hum = getattr(config, 'DEBUG_HUMIDITY', 60)
+    server.update_sensor_data(temp, hum)
+    print(f"[debug] Fake dáta: {temp} °C  {hum} %")
+    while True:
+        await asyncio.sleep(3600)
 
 async def wifi_watchdog(wifi):
     interval = getattr(config, 'WIFI_RECONNECT_INTERVAL', 30)
@@ -88,6 +98,16 @@ async def main():
         _current_mode = 'ap'
         blink(3)  # AP režim aktívny
         print(f"AP aktívny — pripoj sa na '{config.AP_SSID}', otvor http://{ip}")
+
+    if _debug:
+        print("[debug] DEBUG režim — senzor a tlačidlo sú vypnuté")
+        await asyncio.gather(
+            server.run(config.SERVER_PORT),
+            dns_server.run(config.AP_IP),
+            wifi_watchdog(wifi),
+            debug_meranie()
+        )
+        return
 
     on_demand = getattr(config, 'SENSOR_ON_DEMAND', False)
     server.set_sensor(sensor, on_demand)

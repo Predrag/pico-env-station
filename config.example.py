@@ -20,3 +20,8 @@ WIFI_RECONNECT_INTERVAL = 30  # sekundy medzi pokusmi o znovupripojenie po výpa
 # False = intervalové meranie na pozadí
 SENSOR_ON_DEMAND = True
 SENSOR_INTERVAL = 2  # sekundy medzi meraniami (len ak SENSOR_ON_DEMAND = False)
+
+# Debug režim — senzor ani tlačidlo sa neinicializujú, API vracia falošné hodnoty
+DEBUG = False
+DEBUG_TEMPERATURE = 25
+DEBUG_HUMIDITY = 60
