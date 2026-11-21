@@ -68,6 +68,37 @@ Testy bežia na PC bez akéhokoľvek hardvéru. MicroPython moduly (`dht`, `mach
 .venv/bin/pytest tests/ -v
 ```
 
+## Integračný test (`tests/long_run_test.py`)
+
+Dlhodobý test ktorý beží 8 hodín a každú minútu posiela request na `/api/temperature`. Kontroluje HTTP status 200 a správnosť tela odpovede. Po skončení vytvorí textový report.
+
+Skript je nahraný na **RPi4** (`rpi4@rpi4.local`) kde beží nepretržite bez závislosti na Fedore.
+
+### Spustenie na RPi4
+
+```bash
+ssh -i ~/.ssh/githubSsh rpi4@rpi4.local
+nohup python3 -u long_run_test.py > long_run_output.log 2>&1 &
+```
+
+### Sledovanie priebehu
+
+```bash
+tail -f long_run_output.log
+```
+
+### Predčasné zastavenie
+
+```bash
+pgrep -a python3          # nájdi PID skriptu (nie homeassistant)
+kill -INT <PID>           # čisté ukončenie — uloží report
+```
+
+### Výstup
+
+- Priebežný log: `~/long_run_output.log`
+- Finálny report: `~/long_run_report_<datum>.txt`
+
 ## Upload na Pico W
 
 Používa **MicroPico** rozšírenie pre VS Code. Konfigurácia v `.vscode/settings.json`.

@@ -108,6 +108,7 @@ _HTML_MEMORY = """<!DOCTYPE html>
 
 async def _handle(reader, writer):
     try:
+        gc.collect()
         request = await reader.read(512)
         path = request.decode().split(' ')[1] if b' ' in request else '/'
 
@@ -166,16 +167,21 @@ async def _handle(reader, writer):
             writer.write(b"HTTP/1.1 404 Not Found\r\n\r\nNot Found")
 
         await writer.drain()
-    except OSError:
+    except Exception:
         pass
     finally:
         try:
             writer.close()
             await writer.wait_closed()
-        except OSError:
+        except Exception:
             pass
 
 async def run(port=80):
-    server = await asyncio.start_server(_handle, '0.0.0.0', port)
-    print("Server beží na porte 80")
-    await server.wait_closed()
+    while True:
+        try:
+            srv = await asyncio.start_server(_handle, '0.0.0.0', port)
+            print("Server beží na porte 80")
+            await srv.wait_closed()
+        except Exception as e:
+            print(f"[server] Zlyhal: {e}, reštartujem za 2s...")
+            await asyncio.sleep(2)
