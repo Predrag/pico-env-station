@@ -99,6 +99,23 @@ kill -INT <PID>           # čisté ukončenie — uloží report
 - Priebežný log: `~/long_run_output.log`
 - Finálny report: `~/long_run_report_<datum>.txt`
 
+### Sieťová poznámka — RPi4 musí byť na RP-BE58
+
+RPi4 (`192.168.0.89`) a Pico (`192.168.0.235`) musia byť na **rovnakom AP** — inak sa navzájom nevidia (L2 izolácia medzi uzlami AiMesh).
+
+RPi4 sa predvolene pripája na hlavný router (BSSID `3C:7C:3F:6B:A4:E0`). Pico je na repeateri RP-BE58 (BSSID `8A:AD:9F:E4:C8:C9`). Treba prinútiť RPi4 pripojiť sa na repeater:
+
+```bash
+sudo nmcli con modify netplan-wlan0-Siet 802-11-wireless.bssid 8A:AD:9F:E4:C8:C9
+sudo nmcli con up netplan-wlan0-Siet
+```
+
+Zrušenie fixného BSSID (ak treba):
+```bash
+sudo nmcli con modify netplan-wlan0-Siet 802-11-wireless.bssid ""
+sudo nmcli con up netplan-wlan0-Siet
+```
+
 ## Upload na Pico W
 
 Používa **MicroPico** rozšírenie pre VS Code. Konfigurácia v `.vscode/settings.json`.

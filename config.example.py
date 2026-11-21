@@ -1,6 +1,13 @@
 SSID = "your_wifi_ssid"
 PASSWORD = "your_wifi_password"
 
+# Domáca sieť — BSSID prehľad (Pico W podporuje len 2.4GHz)
+# Siet (2.4GHz):
+#   RT-AX86U (hlavný router): 3C:7C:3F:6B:A4:E0
+#   RP-BE58  (repeater, obývačka): 8A:AD:9F:E4:C8:C9  ← Pico sa pripája sem
+# Siet 5 (5GHz):
+#   RT-AX86U + RP-BE58 BSSIDs zatiaľ nezistené
+
 # AP fallback — keď sa Pico nedokáže pripojiť na WiFi
 AP_SSID = "PicoEnvStation"
 AP_PASSWORD = "pico1234"
